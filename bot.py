@@ -186,5 +186,48 @@ async def demote(interaction: discord.Interaction, personne: discord.Member, rai
             ephemeral=True
         )
 
+@bot.tree.command(name="recrute", description="Ajouter les rôles de recrutement à une personne")
+@app_commands.describe(
+    personne="La personne à recruter"
+)
+async def recrute(interaction: discord.Interaction, personne: discord.Member):
+    if not interaction.user.guild_permissions.manage_roles:
+        await interaction.response.send_message("❌ Tu n'as pas la permission !", ephemeral=True)
+        return
+
+    guild = interaction.guild
+    if guild is None:
+        await interaction.response.send_message("❌ Cette commande doit être utilisée dans le serveur.", ephemeral=True)
+        return
+
+    role_1 = guild.get_role(1327023008426102826)
+    role_2 = guild.get_role(1327023010158481433)
+
+    if role_1 is None or role_2 is None:
+        await interaction.response.send_message("❌ Un ou plusieurs rôles sont introuvables !", ephemeral=True)
+        return
+
+    try:
+        await personne.add_roles(
+            role_1,
+            role_2,
+            reason=f"Recrute par {interaction.user}"
+        )
+
+        await interaction.response.send_message(
+            f"✅ {personne.mention} a bien été recruté.",
+            ephemeral=True
+        )
+
+    except discord.Forbidden:
+        await interaction.response.send_message(
+            "❌ Je n'ai pas la permission d'ajouter ces rôles.",
+            ephemeral=True
+        )
+    except discord.HTTPException:
+        await interaction.response.send_message(
+            "❌ Une erreur Discord est survenue.",
+            ephemeral=True
+        )
 
 bot.run(os.getenv("TOKEN"))
