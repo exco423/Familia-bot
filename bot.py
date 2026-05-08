@@ -56,8 +56,25 @@ async def presence(interaction: discord.Interaction, raison: str, heure_fin: str
     role = guild.get_role(ROLE_PRESENCE_ID)
     salon = guild.get_channel(SALON_PRESENCE_ID)
 
-    if role is None or salon is None:
-        await interaction.response.send_message("❌ Rôle ou salon introuvable !", ephemeral=True)
+    if role is None and salon is None:
+        await interaction.response.send_message(
+            f"❌ Rôle ET salon introuvables.\nRole : `{ROLE_PRESENCE_ID}`\nSalon : `{SALON_PRESENCE_ID}`",
+            ephemeral=True
+        )
+        return
+
+    if role is None:
+        await interaction.response.send_message(
+            f"❌ Rôle introuvable : `{ROLE_PRESENCE_ID}`",
+            ephemeral=True
+        )
+        return
+
+    if salon is None:
+        await interaction.response.send_message(
+            f"❌ Salon introuvable : `{SALON_PRESENCE_ID}`",
+            ephemeral=True
+        )
         return
 
     try:
@@ -126,7 +143,6 @@ async def presence(interaction: discord.Interaction, raison: str, heure_fin: str
                 )
 
     asyncio.create_task(rappel_loop())
-
 
 @bot.tree.command(name="demote", description="Retirer tous les rôles d'une personne sauf un")
 @app_commands.describe(
