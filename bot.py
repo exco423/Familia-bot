@@ -19,6 +19,8 @@ CHECK_EMOJI = "✅"
 CROSS_EMOJI = "❌"
 LATE_EMOJI = "⌛"
 
+LAST_PRESENCE_MESSAGE_ID = None
+
 intents = discord.Intents.default()
 intents.members = True
 
@@ -101,6 +103,9 @@ async def presence(interaction: discord.Interaction, raison: str, heure_fin: str
         allowed_mentions=discord.AllowedMentions(roles=True)
     )
 
+    global LAST_PRESENCE_MESSAGE_ID
+    LAST_PRESENCE_MESSAGE_ID = message.id
+
     await message.add_reaction(CHECK_EMOJI)
     await message.add_reaction(CROSS_EMOJI)
     await message.add_reaction(LATE_EMOJI)
@@ -143,6 +148,63 @@ async def presence(interaction: discord.Interaction, raison: str, heure_fin: str
                 )
 
     asyncio.create_task(rappel_loop())
+
+
+@bot.tree.command(name="rappel", description="Ping les membres qui n'ont pas répondu au dernier appel de présence")
+async def rappel(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.manage_roles:
+        await interaction.response.send_message("❌ Tu n'as pas la permission !", ephemeral=True)
+        return
+
+    guild = interaction.guild
+    if guild is None:
+        await interaction.response.send_message("❌ Cette commande doit être utilisée dans le serveur.", ephemeral=True)
+        return
+
+    role = guild.get_role(ROLE_PRESENCE_ID)
+    salon = guild.get_channel(SALON_PRESENCE_ID)
+
+    if role is None or salon is None:
+        await interaction.response.send_message("❌ Rôle ou salon introuvable !", ephemeral=True)
+        return
+
+    if LAST_PRESENCE_MESSAGE_ID is None:
+        await interaction.response.send_message("❌ Aucun appel de présence récent trouvé.", ephemeral=True)
+        return
+
+    try:
+        msg = await salon.fetch_message(LAST_PRESENCE_MESSAGE_ID)
+    except discord.NotFound:
+        await interaction.response.send_message("❌ Le dernier message de présence est introuvable.", ephemeral=True)
+        return
+
+    reactions_users = set()
+
+    for reaction in msg.reactions:
+        if str(reaction.emoji) in [CHECK_EMOJI, CROSS_EMOJI, LATE_EMOJI]:
+            async for user in reaction.users():
+                if not user.bot:
+                    reactions_users.add(user.id)
+
+    non_repondus = [
+        membre for membre in role.members
+        if membre.id not in reactions_users and not membre.bot
+    ]
+
+    if not non_repondus:
+        await interaction.response.send_message("✅ Tout le monde a répondu.", ephemeral=True)
+        return
+
+    mentions = " ".join(m.mention for m in non_repondus)
+
+    await salon.send(
+        f"⚠️ Rappel présence\n"
+        f"Les membres suivants n'ont pas encore répondu :\n{mentions}",
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False)
+    )
+
+    await interaction.response.send_message("✅ Rappel envoyé.", ephemeral=True)
+
 
 @bot.tree.command(name="demote", description="Retirer tous les rôles d'une personne sauf un")
 @app_commands.describe(
@@ -202,6 +264,7 @@ async def demote(interaction: discord.Interaction, personne: discord.Member, rai
             ephemeral=True
         )
 
+
 @bot.tree.command(name="recrute", description="Ajouter les rôles de recrutement à une personne")
 @app_commands.describe(
     personne="La personne à recruter"
@@ -245,5 +308,6 @@ async def recrute(interaction: discord.Interaction, personne: discord.Member):
             "❌ Une erreur Discord est survenue.",
             ephemeral=True
         )
+
 
 bot.run(os.getenv("TOKEN"))
